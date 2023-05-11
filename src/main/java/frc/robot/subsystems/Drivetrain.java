@@ -287,7 +287,7 @@ public class Drivetrain extends SubsystemBase {
     //   setOdometry(newPos);
     // }
 
-    if((limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) || limelightTable.getEntry("tv").getDouble(0.0) == 0) {
+    if((limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) || (limelightTable.getEntry("tv").getDouble(0.0) == 0 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 1)) {
       odometer.addVisionMeasurement(
         getRobotPoseFromAprilTag(2), 
         Timer.getFPGATimestamp() - 
