@@ -290,23 +290,22 @@ public class Drivetrain extends SubsystemBase {
     //   setOdometry(newPos);
     // }
 
+    int limelight = 1;
+
     if((limelightTwoTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2] < limelightTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2]) || (limelightTable.getEntry("tv").getDouble(0.0) == 0 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 1)) {
-      odometer.addVisionMeasurement(
-        getRobotPoseFromAprilTag(2), 
-        Timer.getFPGATimestamp() - 
-          limelightTable.getEntry("tl").getDouble(0.0)/1000 - 
-          limelightTable.getEntry("cl").getDouble(0.0)/1000
-      );
+      limelight = 2;
     } else if((limelightTwoTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2] > limelightTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2]) || (limelightTable.getEntry("tv").getDouble(0.0) == 1 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 0)){
-      odometer.addVisionMeasurement(
-        getRobotPoseFromAprilTag(1), 
-        Timer.getFPGATimestamp() - 
-          limelightTwoTable.getEntry("tl").getDouble(0.0)/1000 - 
-          limelightTwoTable.getEntry("cl").getDouble(0.0)/1000
-      );
+      limelight = 1;
     } else {
       System.err.println("Something went wrong with the vision measurements");
     }
+
+    double latency = getRobotPoseArrayFromAprilTag(limelight)[6]/1000;
+
+    odometer.addVisionMeasurement(
+      getRobotPoseFromAprilTag(limelight), 
+      Timer.getFPGATimestamp() - latency
+    );
     
   }
 
@@ -353,6 +352,14 @@ public class Drivetrain extends SubsystemBase {
       var pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getEstimatedPosition().getRotation());
   
       return pose2d;
+  }
+
+  public double[] getRobotPoseArrayFromAprilTag(int limelight){
+    if(limelight == 1){
+      return limelightTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
+    } else {
+      return limelightTwoTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
+    }
   }
 
   public Pose2d getRobotPoseFromAprilTag(int limelight) {
