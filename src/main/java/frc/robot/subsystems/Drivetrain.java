@@ -287,20 +287,22 @@ public class Drivetrain extends SubsystemBase {
     //   setOdometry(newPos);
     // }
 
-    if((limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) || (limelightTable.getEntry("tv").getDouble(0.0) == 0 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 1)) {
+    if((limelightTwoTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2] < limelightTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2]) || (limelightTable.getEntry("tv").getDouble(0.0) == 0 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 1)) {
       odometer.addVisionMeasurement(
         getRobotPoseFromAprilTag(2), 
         Timer.getFPGATimestamp() - 
           limelightTable.getEntry("tl").getDouble(0.0)/1000 - 
           limelightTable.getEntry("cl").getDouble(0.0)/1000
       );
-    } else {
+    } else if((limelightTwoTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2] > limelightTable.getEntry("targetpose-cameraspace").getDoubleArray(new double[6])[2]) || (limelightTable.getEntry("tv").getDouble(0.0) == 1 && limelightTwoTable.getEntry("tv").getDouble(0.0) == 0)){
       odometer.addVisionMeasurement(
         getRobotPoseFromAprilTag(1), 
         Timer.getFPGATimestamp() - 
           limelightTwoTable.getEntry("tl").getDouble(0.0)/1000 - 
           limelightTwoTable.getEntry("cl").getDouble(0.0)/1000
       );
+    } else {
+      System.err.println("Something went wrong with the vision measurements");
     }
     
   }
