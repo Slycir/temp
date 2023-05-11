@@ -10,7 +10,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
-import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
+// import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -52,7 +52,7 @@ public class Drivetrain extends SubsystemBase {
 
   private SwerveDrivePoseEstimator odometer;
   private AHRS navx = new AHRS();
-  private Pose2d oldPos = null;
+  // private Pose2d oldPos = null;
   private PIDController xController;
   private PIDController yController;
   private PIDController thetaController;
