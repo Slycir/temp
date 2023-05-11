@@ -143,6 +143,9 @@ public class Drivetrain extends SubsystemBase {
     // If Limelight has a target, update the odometry with the Limelight's pose
     if(limelightTable.getEntry("tv").getDouble(0) == 1 || limelightTwoTable.getEntry("tv").getDouble(0) == 1) {
       updateOdometryIfTag();
+      SmartDashboard.putBoolean("Tag Updating", true);
+    } else {
+      SmartDashboard.putBoolean("Tag Updating", false);
     }
   }
 
