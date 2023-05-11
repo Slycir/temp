@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
@@ -49,7 +50,7 @@ public class Drivetrain extends SubsystemBase {
       new Translation2d(-kModuleXOffsetMeters, kModuleYOffsetMeters),
       new Translation2d(-kModuleXOffsetMeters, -kModuleYOffsetMeters));
 
-  private SwerveDriveOdometry odometer;
+  private SwerveDrivePoseEstimator odometer;
   private AHRS navx = new AHRS();
   private Pose2d oldPos = null;
   private PIDController xController;
@@ -57,6 +58,9 @@ public class Drivetrain extends SubsystemBase {
   private PIDController thetaController;
   
   public DoubleArraySubscriber botPoseSub, tagPoseSub; 
+
+  public double desiredVelocityAverage = 0;
+  public double actualVelocityAverage = 0;
 
   public TrajectoryConfig config = new TrajectoryConfig(
       Constants.MeasurementConstants.kMaxSpeedMetersPerSecond / 2,
@@ -101,7 +105,7 @@ public class Drivetrain extends SubsystemBase {
         kBackRightEncoderID,
         kBackRightEncoderOffset);
 
-    odometer = new SwerveDriveOdometry(m_kinematics, getGyroRotation2d(), getModulePositions());
+    odometer = new SwerveDrivePoseEstimator(m_kinematics, getGyroRotation2d(), getModulePositions(), new Pose2d());
   }
 
   public void recalibrateModulesEncoders() { // Call if modules are not in the correct position
@@ -136,10 +140,14 @@ public class Drivetrain extends SubsystemBase {
     odometer.update(
         getGyroRotation2d(),
         getModulePositions());
+    // If Limelight has a target, update the odometry with the Limelight's pose
+    if(limelightTable.getEntry("tv").getDouble(0) == 1 || limelightTwoTable.getEntry("tv").getDouble(0) == 1) {
+      updateOdometryIfTag();
+    }
   }
 
   public double getOdometryYaw() {
-    var pos = -odometer.getPoseMeters().getRotation().getDegrees() % 360;
+    var pos = -odometer.getEstimatedPosition().getRotation().getDegrees() % 360;
     return pos < -180 ? pos + 360 : pos;
   }
 
@@ -169,7 +177,7 @@ public class Drivetrain extends SubsystemBase {
   }
 
   public Pose2d getFieldPosition() {
-    return odometer.getPoseMeters();
+    return odometer.getEstimatedPosition();
   }
 
   public void stop() {
@@ -194,7 +202,7 @@ public class Drivetrain extends SubsystemBase {
             xSpeed,
             ySpeed,
             rot,
-            odometer.getPoseMeters().getRotation()));
+            odometer.getEstimatedPosition().getRotation()));
 
     setModuleStates(swerveModuleStates);
   }
@@ -202,7 +210,7 @@ public class Drivetrain extends SubsystemBase {
   public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
     SwerveModuleState[] swerveModuleStates = m_kinematics.toSwerveModuleStates(
         fieldRelative
-            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, odometer.getPoseMeters().getRotation())
+            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, odometer.getEstimatedPosition().getRotation())
             : new ChassisSpeeds(xSpeed, ySpeed, rot));
 
     setModuleStates(swerveModuleStates);
@@ -211,7 +219,7 @@ public class Drivetrain extends SubsystemBase {
   public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative, Translation2d ctrOfRot) {
     SwerveModuleState[] swerveModuleStates = m_kinematics.toSwerveModuleStates(
         fieldRelative
-            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, odometer.getPoseMeters().getRotation())
+            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, odometer.getEstimatedPosition().getRotation())
             : new ChassisSpeeds(xSpeed, ySpeed, rot), ctrOfRot);
 
     setModuleStates(swerveModuleStates);
@@ -226,6 +234,8 @@ public class Drivetrain extends SubsystemBase {
 
   public void setModuleStates(SwerveModuleState[] states) {
     SwerveDriveKinematics.desaturateWheelSpeeds(states, kMaxSpeedMetersPerSecond);
+
+    desiredVelocityAverage = Math.abs(states[0].speedMetersPerSecond + states[1].speedMetersPerSecond + states[2].speedMetersPerSecond + states[3].speedMetersPerSecond) / 4;
 
     m_frontLeft.setDesiredStateOpen(states[0]);
     m_frontRight.setDesiredStateOpen(states[1]);
@@ -256,6 +266,7 @@ public class Drivetrain extends SubsystemBase {
 
   @Override
   public void periodic() {
+    actualVelocityAverage = (m_frontLeft.getModuleVelocity() + m_frontRight.getModuleVelocity() + m_backLeft.getModuleVelocity() + m_backRight.getModuleVelocity()) / 4;
     SmartDashboard.putString("Pose1", getRobotPoseFromAprilTag().toString());
     SmartDashboard.putString("Pose2", getAlternateRobotPoseFromAprilTag().toString());
     updateOdometry();
@@ -264,16 +275,27 @@ public class Drivetrain extends SubsystemBase {
     // SmartDashboard.putNumber("NavXYaw", getNavxYaw());
     SmartDashboard.putString("Gyro Rotation", getGyroRotation2d().toString());
     // SmartDashboard.putNumber("Pitch", getNavxPitch());
-    SmartDashboard.putString("Position", odometer.getPoseMeters().toString());
+    SmartDashboard.putString("Position", odometer.getEstimatedPosition().toString());
+    SmartDashboard.putNumber("Desired Velocity Average", desiredVelocityAverage);
+    SmartDashboard.putNumber("Actual Velocity Average", actualVelocityAverage);
+    SmartDashboard.putNumber("Desired/Acutal Velocity Ratio", desiredVelocityAverage / actualVelocityAverage);
   }
 
   public void updateOdometryIfTag() {
-      if (getTV() == 1 && getTID() < 4 || getTID() > 5 &&  getTID() < 9 && isDetectingAprilTags()) {
-        var newPos = new Pose2d(getRobotPoseFromAprilTag().getTranslation(), getFieldPosition().getRotation());
-        setOdometry(newPos);
-      }
+    // if (getTV() == 1 && getTID() < 4 || getTID() > 5 &&  getTID() < 9 && isDetectingAprilTags()) {
+    //   var newPos = new Pose2d(getRobotPoseFromAprilTag().getTranslation(), getFieldPosition().getRotation());
+    //   setOdometry(newPos);
+    // }
+
+    if(limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) {
+      odometer.addVisionMeasurement(getRobotPoseFromAprilTag(2), Timer.getFPGATimestamp() - limelightTable.getEntry("tl").getDouble(0.0)/1000 - limelightTable.getEntry("cl").getDouble(0.0)/1000);
+    } else {
+      odometer.addVisionMeasurement(getRobotPoseFromAprilTag(1), Timer.getFPGATimestamp() - limelightTwoTable.getEntry("tl").getDouble(0.0)/1000 - limelightTwoTable.getEntry("cl").getDouble(0.0)/1000);
+    }
     
   }
+
+
 
   /// **********VISION SECTION *************/
   public int getTV() {
@@ -313,14 +335,28 @@ public class Drivetrain extends SubsystemBase {
 
   public Pose2d getRobotPoseFromAprilTag() {
       var entry = limelightTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
-      var pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getPoseMeters().getRotation());
+      var pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getEstimatedPosition().getRotation());
   
       return pose2d;
   }
 
+  public Pose2d getRobotPoseFromAprilTag(int limelight) {
+    Pose2d pose2d;
+
+    if(limelight == 1){
+      var entry = limelightTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
+      pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getEstimatedPosition().getRotation());
+    } else {
+      var entry = limelightTwoTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
+      pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getEstimatedPosition().getRotation());
+    }
+
+    return pose2d;
+}
+
   public Pose2d getAlternateRobotPoseFromAprilTag() {
       var entry = limelightTwoTable.getEntry("botpose").getDoubleArray(new double[]{getFieldPosition().getX(), getFieldPosition().getY()});
-      var pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getPoseMeters().getRotation());
+      var pose2d = new Pose2d(new Translation2d(entry[0], entry[1]), odometer.getEstimatedPosition().getRotation());
   
       return pose2d;
   }

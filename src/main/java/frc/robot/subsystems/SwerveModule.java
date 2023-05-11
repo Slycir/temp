@@ -104,6 +104,10 @@ public class SwerveModule extends SubsystemBase {
     updatePosition();
     return m_modulePosition;
   }
+
+  public double getModuleVelocity(){
+    return Math.abs(m_driveRelativeEncoder.getVelocity());
+  }
   
   public Rotation2d getSteerAngle(){
     double angle = m_steerRelativeEncoder.getPosition() - m_steerEncoderOffset;
