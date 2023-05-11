@@ -287,10 +287,20 @@ public class Drivetrain extends SubsystemBase {
     //   setOdometry(newPos);
     // }
 
-    if(limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) {
-      odometer.addVisionMeasurement(getRobotPoseFromAprilTag(2), Timer.getFPGATimestamp() - limelightTable.getEntry("tl").getDouble(0.0)/1000 - limelightTable.getEntry("cl").getDouble(0.0)/1000);
+    if((limelightTable.getEntry("tx").getDouble(0.0) > limelightTwoTable.getEntry("tx").getDouble(0.0)) || limelightTable.getEntry("tv").getDouble(0.0) == 0) {
+      odometer.addVisionMeasurement(
+        getRobotPoseFromAprilTag(2), 
+        Timer.getFPGATimestamp() - 
+          limelightTable.getEntry("tl").getDouble(0.0)/1000 - 
+          limelightTable.getEntry("cl").getDouble(0.0)/1000
+      );
     } else {
-      odometer.addVisionMeasurement(getRobotPoseFromAprilTag(1), Timer.getFPGATimestamp() - limelightTwoTable.getEntry("tl").getDouble(0.0)/1000 - limelightTwoTable.getEntry("cl").getDouble(0.0)/1000);
+      odometer.addVisionMeasurement(
+        getRobotPoseFromAprilTag(1), 
+        Timer.getFPGATimestamp() - 
+          limelightTwoTable.getEntry("tl").getDouble(0.0)/1000 - 
+          limelightTwoTable.getEntry("cl").getDouble(0.0)/1000
+      );
     }
     
   }
